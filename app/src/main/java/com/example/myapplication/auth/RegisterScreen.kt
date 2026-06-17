@@ -65,7 +65,7 @@ fun RegisterScreen(navController: NavController) {
 
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
                 Spacer(modifier = Modifier.width(10.dp))
-                Text(text = "Tên app", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = DiscordLightGray)
+                Text(text = "Lumina", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = DiscordLightGray)
             }
 
             Spacer(modifier = Modifier.height(40.dp))

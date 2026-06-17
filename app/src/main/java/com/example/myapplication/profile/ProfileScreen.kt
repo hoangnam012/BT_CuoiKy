@@ -36,7 +36,7 @@ fun ProfileScreen(
     targetUserId: Int,
     loggedInUserId: Int,
     onNavigateBack: () -> Unit,
-    onNavigateToChat: (Int) -> Unit,
+    onNavigateToChat: (Int, String, String) -> Unit,
     onLogout: () -> Unit,
     viewModel: ProfileViewModel = viewModel()
 ) {
@@ -87,7 +87,14 @@ fun ProfileScreen(
                         isOwnProfile = state.isOwnProfile,
                         actionLoading = actionState is ProfileAction.Loading,
                         onSendFriendRequest = { viewModel.sendFriendRequest(state.user.id) },
-                        onMessage    = { onNavigateToChat(state.user.id) },
+                        onAcceptFriendRequest = { viewModel.acceptFriendRequest() },
+                        onMessage    = {
+                            onNavigateToChat(
+                                state.user.id,
+                                state.user.username,
+                                state.user.avatarUrl ?: ""
+                            )
+                        },
                         onEditProfile = { showEditDialog = true },
                         onLogout     = onLogout
                     )
@@ -140,6 +147,7 @@ private fun ProfileContent(
     isOwnProfile: Boolean,
     actionLoading: Boolean,
     onSendFriendRequest: () -> Unit,
+    onAcceptFriendRequest: () -> Unit,
     onMessage: () -> Unit,
     onEditProfile: () -> Unit,
     onLogout: () -> Unit
@@ -159,6 +167,7 @@ private fun ProfileContent(
             friendStatus = friendStatus,
             actionLoading = actionLoading,
             onSendFriendRequest = onSendFriendRequest,
+            onAcceptFriendRequest = onAcceptFriendRequest,
             onMessage = onMessage,
             onEditProfile = onEditProfile,
             onLogout = onLogout
@@ -327,6 +336,7 @@ private fun ActionButtonsRow(
     friendStatus: FriendStatus,
     actionLoading: Boolean,
     onSendFriendRequest: () -> Unit,
+    onAcceptFriendRequest: () -> Unit,
     onMessage: () -> Unit,
     onEditProfile: () -> Unit,
     onLogout: () -> Unit
@@ -401,11 +411,11 @@ private fun ActionButtonsRow(
                 FriendStatus.PENDING_RECEIVED -> {
                     ActionChip(
                         text = "Chấp nhận",
-                        icon = Icons.Outlined.PersonAdd,
+                        icon = Icons.Outlined.Check,
                         containerColor = colorScheme.primary, // hoặc tertiary
                         enabled = !actionLoading,
                         showLoading = actionLoading,
-                        onClick = onSendFriendRequest,
+                        onClick = onAcceptFriendRequest,
                         modifier = Modifier.weight(1f)
                     )
                     ActionChip(
@@ -422,20 +432,6 @@ private fun ActionButtonsRow(
                         icon = Icons.Outlined.MailOutline,
                         containerColor = colorScheme.primary,
                         onClick = onMessage,
-                        modifier = Modifier.weight(1f)
-                    )
-                    ActionChip(
-                        text = "Gọi thoại",
-                        icon = Icons.Filled.Call,
-                        containerColor = colorScheme.tertiary, // DiscordYellow
-                        onClick = { /* TODO */ },
-                        modifier = Modifier.weight(1f)
-                    )
-                    ActionChip(
-                        text = "Video",
-                        icon = Icons.Filled.Videocam,
-                        containerColor = colorScheme.secondary, // DiscordGreen
-                        onClick = { /* TODO */ },
                         modifier = Modifier.weight(1f)
                     )
                 }

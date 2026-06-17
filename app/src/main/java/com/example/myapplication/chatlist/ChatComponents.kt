@@ -1,4 +1,4 @@
-package com.example.myapplication.ui.chatlist
+package com.example.myapplication.chatlist
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,12 +32,33 @@ fun TopHeader(title: String, showEdit: Boolean, onEditClick: () -> Unit = {}) {
 }
 
 @Composable
-fun ActiveUsersRow(users: List<ActiveUser>) {
+fun ActiveUsersRow(users: List<ActiveUser>,
+                   onUserClick: (ActiveUser) -> Unit) {
     LazyRow(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         items(users) { user ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(60.dp)) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(60.dp).clickable {
+                onUserClick(user)
+            }) {
                 Box {
-                    Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(Color.Gray), contentAlignment = Alignment.Center) { Text(text = user.name.take(1), color = Color.White, fontWeight = FontWeight.Bold) }
+                    val avatarUrl = user.avatarUrl // Đảm bảo model ActiveUser của bạn đã có biến avatarUrl kiểu String?
+
+                    if (!avatarUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = avatarUrl,
+                            contentDescription = "Avatar",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(56.dp).clip(CircleShape).background(Color.DarkGray)
+                        )
+                    } else {
+                        AsyncImage(
+                            model = "https://ui-avatars.com/api/?name=${user.name.replace(" ", "+")}&background=random",
+                            contentDescription = "Avatar",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(56.dp).clip(CircleShape).background(Color.DarkGray)
+                        )
+                    }
+                    // -------------------------------------------
+
                     if (user.isOnline) {
                         Box(modifier = Modifier.size(14.dp).align(Alignment.TopEnd).offset((-2).dp, 2.dp).clip(CircleShape).background(OnlineGreen).border(2.dp, BackgroundDark, CircleShape))
                     }
@@ -51,7 +72,7 @@ fun ActiveUsersRow(users: List<ActiveUser>) {
 
 @Composable
 fun ChatItemRow(chatItem: ChatItemData, onPinToggle: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().clickable { }.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Box {
             if (chatItem.avatarUrl.isNotEmpty()) {
                 AsyncImage(
@@ -97,9 +118,6 @@ fun ChatItemRow(chatItem: ChatItemData, onPinToggle: () -> Unit) {
 fun MainBottomNavigationBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
     NavigationBar(containerColor = SurfaceDark, tonalElevation = 8.dp) {
         NavigationBarItem(icon = { Icon(Icons.Default.Chat, contentDescription = null) }, label = { Text("Chat") }, selected = selectedTab == 0, onClick = { onTabSelected(0) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = PinkAccent, unselectedIconColor = Color.Gray, indicatorColor = Color.Transparent))
-        NavigationBarItem(icon = { Icon(Icons.Default.Notifications, contentDescription = null) }, label = { Text("Thông báo") }, selected = selectedTab == 1, onClick = { onTabSelected(1) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = PinkAccent, unselectedIconColor = Color.Gray, indicatorColor = Color.Transparent))
-        NavigationBarItem(icon = { Icon(Icons.Default.Contacts, contentDescription = null) }, label = { Text("Danh bạ") }, selected = selectedTab == 2, onClick = { onTabSelected(2) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = PinkAccent, unselectedIconColor = Color.Gray, indicatorColor = Color.Transparent))
-        NavigationBarItem(icon = { Icon(Icons.Default.PlayArrow, contentDescription = null) }, label = { Text("Reel") }, selected = selectedTab == 3, onClick = { onTabSelected(3) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = PinkAccent, unselectedIconColor = Color.Gray, indicatorColor = Color.Transparent))
         NavigationBarItem(icon = { Icon(Icons.Default.Settings, contentDescription = null) }, label = { Text("Cài đặt") }, selected = selectedTab == 4, onClick = { onTabSelected(4) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = PinkAccent, unselectedIconColor = Color.Gray, indicatorColor = Color.Transparent))
     }
 }

@@ -1,4 +1,4 @@
-package com.example.myapplication.ui.chatlist
+package com.example.myapplication.chatlist
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,11 +22,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 
 @Composable
 fun SearchMainScreen(recentSearches: List<SearchUser>, onBack: () -> Unit, onEditClick: () -> Unit, onSearchBarClick: () -> Unit) {
@@ -83,7 +85,8 @@ fun SearchEditScreen(recentSearches: MutableList<SearchUser>, onBack: () -> Unit
 fun SearchActiveScreen(
     searchResults: List<SearchUser>, // Nhận kết quả từ ViewModel
     onSearchQueryChange: (String) -> Unit, // Hàm bắn từ khóa lên ViewModel
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onUserClick: (SearchUser) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
@@ -118,7 +121,9 @@ fun SearchActiveScreen(
                 Text(text = "Kết quả tìm kiếm", color = PinkAccent, fontSize = 14.sp, modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp))
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(searchResults) { user ->
-                        Row(modifier = Modifier.fillMaxWidth().clickable { /* Xử lý khi bấm vào kết quả */ }.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(modifier = Modifier.fillMaxWidth().clickable {
+                        onUserClick(user)
+                        }.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.DarkGray), contentAlignment = Alignment.Center) {
                                 Text(text = user.name.take(1), color = Color.White, fontSize = 18.sp)
                             }
@@ -133,12 +138,18 @@ fun SearchActiveScreen(
 }
 
 @Composable
-fun NewMessageScreen(contacts: List<ChatItemData>, onBack: () -> Unit, onGroupClick: () -> Unit, onPinClick: () -> Unit) {
+fun NewMessageScreen(
+    users: List<SearchUser>,
+    onBack: () -> Unit,
+    onGroupClick: () -> Unit,
+    onPinClick: () -> Unit,
+    onUserClick: (SearchUser) -> Unit
+) {
     var query by remember { mutableStateOf("") }
 
     // Lọc danh sách theo từ khóa tìm kiếm (nếu có gõ)
-    val filteredContacts = if (query.isBlank()) contacts else contacts.filter {
-        it.senderName.contains(query, ignoreCase = true)
+    val filteredUsers = if (query.isBlank()) users else users.filter {
+        it.name.contains(query, ignoreCase = true)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -155,26 +166,40 @@ fun NewMessageScreen(contacts: List<ChatItemData>, onBack: () -> Unit, onGroupCl
 
         // Hiển thị danh sách Gợi ý từ Database có thể lướt
         LazyColumn(modifier = Modifier.fillMaxSize()) {
-            items(filteredContacts) { user ->
-                Row(modifier = Modifier.fillMaxWidth().clickable { /* Click để chat */ }.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-
-                    // Hiển thị Avatar
-                    // Hiển thị Avatar
-                    if (user.avatarUrl.isNotEmpty()) {
-                        coil.compose.AsyncImage(
-                            model = user.avatarUrl,
+            items(filteredUsers) { user ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onUserClick(user)
+                        }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val avatarUrl = user.avatarUrl
+                    if (!avatarUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = avatarUrl,
                             contentDescription = "Avatar",
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop, // <--- THÊM CHỮ "contentScale =" VÀO ĐÂY
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.DarkGray)
                         )
                     } else {
-                        Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.Gray), contentAlignment = Alignment.Center) {
-                            Text(text = user.senderName.take(1), color = Color.White)
-                        }
+                        AsyncImage(
+                            model = "https://ui-avatars.com/api/?name=${user.name.replace(" ", "+")}&background=random",
+                            contentDescription = "Avatar",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.DarkGray)
+                        )
                     }
 
                     Spacer(modifier = Modifier.width(16.dp))
-                    Text(text = user.senderName, color = Color.White, fontSize = 16.sp)
+
+                    Text(
+                        text = user.name,
+                        color = Color.White,
+                        fontSize = 16.sp
+                    )
                 }
             }
         }
@@ -193,9 +218,40 @@ fun NewGroupScreen(contacts: List<SearchUser>, selectedMembers: MutableList<Sear
         Text(if (searchQuery.isEmpty()) "Gợi ý" else "Kết quả", color = Color.Gray, fontWeight = FontWeight.Bold, modifier = Modifier.padding(16.dp))
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(filteredContacts) { user -> val isSelected = selectedMembers.contains(user)
-                Row(modifier = Modifier.fillMaxWidth().clickable { if (isSelected) selectedMembers.remove(user) else selectedMembers.add(user) }.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.Gray), contentAlignment = Alignment.Center) { Text(text = user.name.take(1), color = Color.White) }; Spacer(modifier = Modifier.width(16.dp)); Text(text = user.name, color = Color.White, fontSize = 16.sp, modifier = Modifier.weight(1f))
-                    if (isSelected) { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = PinkAccent, modifier = Modifier.size(24.dp)) } else { Icon(Icons.Outlined.Circle, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(24.dp)) }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { if (isSelected) selectedMembers.remove(user) else selectedMembers.add(user) }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+
+                    val avatarUrl = user.avatarUrl
+                    if (!avatarUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = avatarUrl,
+                            contentDescription = "Avatar",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.DarkGray)
+                        )
+                    } else {
+                        AsyncImage(
+                            model = "https://ui-avatars.com/api/?name=${user.name.replace(" ", "+")}&background=random",
+                            contentDescription = "Avatar",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.DarkGray)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(text = user.name, color = Color.White, fontSize = 16.sp, modifier = Modifier.weight(1f))
+
+                    // Dấu check chọn nhóm
+                    if (isSelected) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = PinkAccent, modifier = Modifier.size(24.dp))
+                    } else {
+                        Icon(Icons.Outlined.Circle, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(24.dp))
+                    }
                 }
             }
         }
@@ -219,9 +275,31 @@ fun GroupInfoScreen(selectedMembers: MutableList<SearchUser>, groupName: String,
             items(selectedMembers) { user ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(bottom = 16.dp)) {
                     Box {
-                        Box(modifier = Modifier.size(56.dp).clip(CircleShape).background(Color.Gray), contentAlignment = Alignment.Center) { Text(text = user.name.take(1), color = Color.White, fontWeight = FontWeight.Bold) }
-                        Box(modifier = Modifier.size(20.dp).align(Alignment.TopEnd).clip(CircleShape).background(Color.DarkGray).border(1.dp, BackgroundDark, CircleShape).clickable { selectedMembers.remove(user) }, contentAlignment = Alignment.Center) { Icon(Icons.Default.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp)) }
-                    }; Spacer(modifier = Modifier.height(4.dp)); Text(text = user.name, color = Color.LightGray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val avatarUrl = user.avatarUrl
+                        if (!avatarUrl.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = avatarUrl,
+                                contentDescription = "Avatar",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.size(56.dp).clip(CircleShape).background(Color.DarkGray)
+                            )
+                        } else {
+                            AsyncImage(
+                                model = "https://ui-avatars.com/api/?name=${user.name.replace(" ", "+")}&background=random",
+                                contentDescription = "Avatar",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.size(56.dp).clip(CircleShape).background(Color.DarkGray)
+                            )
+                        }
+                        // ─────────────────────────────────────
+
+                        // Nút X nhỏ xóa thành viên
+                        Box(modifier = Modifier.size(20.dp).align(Alignment.TopEnd).clip(CircleShape).background(Color.DarkGray).border(1.dp, BackgroundDark, CircleShape).clickable { selectedMembers.remove(user) }, contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = user.name, color = Color.LightGray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -256,10 +334,10 @@ fun PinChatScreen(
                 ) {
                     // Hiển thị Avatar thật
                     if (user.avatarUrl.isNotEmpty()) {
-                        coil.compose.AsyncImage(
+                        AsyncImage(
                             model = user.avatarUrl,
                             contentDescription = "Avatar",
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier.size(48.dp).clip(CircleShape).background(Color.DarkGray)
                         )
                     } else {

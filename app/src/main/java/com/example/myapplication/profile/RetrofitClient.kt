@@ -10,7 +10,7 @@ object RetrofitClient {
 
     // Android Emulator -> dùng 10.0.2.2
     private const val BASE_URL =
-        "http://10.0.2.2/BT_CuoiKyBackend/"
+        "http://10.0.2.2:8081/BT_CuoiKyBackend/"
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY

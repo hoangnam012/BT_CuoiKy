@@ -54,6 +54,8 @@ class ProfileViewModel(
         _actionState.asStateFlow()
 
     private var currentUserId = 0
+    private var currentTargetUserId: Int = 0
+    private var currentLoggedInUserId: Int = 0
 
     fun loadProfile(
         targetUserId: Int,
@@ -61,6 +63,9 @@ class ProfileViewModel(
     ) {
 
         currentUserId = loggedInUserId
+
+        currentTargetUserId = targetUserId
+        currentLoggedInUserId = loggedInUserId
 
         viewModelScope.launch {
 
@@ -166,6 +171,7 @@ class ProfileViewModel(
                     ProfileAction.Success(
                         "Cập nhật thành công"
                     )
+                loadProfile(currentTargetUserId, currentLoggedInUserId)
 
             } else {
 
@@ -180,5 +186,26 @@ class ProfileViewModel(
 
     fun resetActionState() {
         _actionState.value = ProfileAction.Idle
+    }
+    fun acceptFriendRequest() {
+        viewModelScope.launch {
+            _actionState.value = ProfileAction.Loading
+
+            // targetUserId là người gửi, loggedInUserId là người nhận
+            val result = repository.acceptFriendRequest(
+                senderId = currentTargetUserId,
+                receiverId = currentLoggedInUserId
+            )
+
+            if (result.isSuccess) {
+                _actionState.value = ProfileAction.Success(result.getOrNull()!!)
+                // Gọi lại loadProfile để màn hình tự refresh thành nút "Nhắn tin / Gọi thoại"
+                loadProfile(currentTargetUserId, currentLoggedInUserId)
+            } else {
+                _actionState.value = ProfileAction.Error(
+                    result.exceptionOrNull()?.message ?: "Lỗi chấp nhận kết bạn"
+                )
+            }
+        }
     }
 }

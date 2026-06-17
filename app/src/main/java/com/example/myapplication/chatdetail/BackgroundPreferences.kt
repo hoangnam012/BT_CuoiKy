@@ -8,7 +8,7 @@ import java.io.FileOutputStream
 object BackgroundPreferences {
     private const val PREPS_NAME= "ChatSettings"
 
-    fun saveBackGroundLocal(context: Context, myId: Int, targetId: Int, isGroup: Boolean, uri: Uri) {
+    fun saveBackGroundLocal(context: Context, myId: Int, targetId: String, isGroup: Boolean, uri: Uri) {
         val sharedPref = context.getSharedPreferences(PREPS_NAME, Context.MODE_PRIVATE)
         val key = "bg_${myId}_${targetId}_${isGroup}"
         with(sharedPref.edit()) {
@@ -17,14 +17,14 @@ object BackgroundPreferences {
         }
     }
 
-    fun getBackgroundLocal(context: Context, myId: Int, targetId: Int, isGroup: Boolean): Uri? {
+    fun getBackgroundLocal(context: Context, myId: Int, targetId: String, isGroup: Boolean): Uri? {
         val sharePref = context.getSharedPreferences(PREPS_NAME, Context.MODE_PRIVATE)
         val key = "bg_${myId}_${targetId}_${isGroup}"
         val uriString = sharePref.getString(key, null)
         return if (uriString != null) Uri.parse(uriString) else null
     }
 
-    fun clearBackgroundLocal(context: Context, myId: Int, targetId: Int, isGroup: Boolean) {
+    fun clearBackgroundLocal(context: Context, myId: Int, targetId: String, isGroup: Boolean) {
         val sharedPref = context.getSharedPreferences(PREPS_NAME, Context.MODE_PRIVATE)
         val key = "bg_${myId}_${targetId}_${isGroup}"
         with(sharedPref.edit()) {

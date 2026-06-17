@@ -1,4 +1,4 @@
-package com.example.myapplication.ui.chatlist
+package com.example.myapplication.chatlist
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
@@ -12,6 +12,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Query
 
 // --- BẢNG MÀU ---
 val Purple80 = Color(0xFFD0BCFF)
@@ -32,7 +33,7 @@ val OfflineOrange = Color(0xFFFF9800)
 
 // --- DATA MODELS ---
 @Immutable
-data class ActiveUser(val id: String, val name: String, val avatarUrl: String, val isOnline: Boolean)
+data class ActiveUser(val id: String, val name: String, val avatarUrl: String? = "", val isOnline: Boolean)
 
 @Immutable
 data class ChatItemData(
@@ -43,31 +44,34 @@ data class ChatItemData(
 )
 
 @Immutable
-data class SearchUser(val id: String, val name: String, var isPinned: Boolean = false)
+data class SearchUser(val id: String, val name: String, var isPinned: Boolean = false,val avatarUrl: String? = "")
 
 data class TogglePinRequest(val id: String, val isPinned: Boolean, val userId: String)
-data class CreateGroupRequest(val groupName: String, val groupType: String, val memberIds: List<String>)
+data class CreateGroupRequest(val groupName: String, val groupType: String, val memberIds: List<String>, val creatorId: String)
 
 // --- RETROFIT API ---
 interface ChatApiService {
-    @GET("chatapp/get_chats.php")
-    suspend fun getChats(@retrofit2.http.Query("userId") userId: String): List<ChatItemData> // Truyền userId vào
+    @GET("BT_CuoiKyBackend/chatlist/get_chats.php")
+    suspend fun getChats(@Query("userId") userId: String): List<ChatItemData>
 
-    @GET("chatapp/get_active_users.php")
+    @GET("BT_CuoiKyBackend/chatlist/get_active_users.php")
     suspend fun getActiveUsers(): List<ActiveUser>
 
-    @POST("chatapp/toggle_pin.php")
+    @POST("BT_CuoiKyBackend/chatlist/toggle_pin.php")
     suspend fun togglePin(@Body request: TogglePinRequest)
 
-    @GET("chatapp/search_users.php")
-    suspend fun searchUsers(@retrofit2.http.Query("q") query: String): List<SearchUser>
+    @GET("BT_CuoiKyBackend/chatlist/search_users.php")
+    suspend fun searchUsers(@Query("q") query: String): List<SearchUser>
 
-    @POST("chatapp/create_group.php")
+    @POST("BT_CuoiKyBackend/chatlist/create_group.php")
     suspend fun createGroup(@Body request: CreateGroupRequest)
+
+    @GET("BT_CuoiKyBackend/chatlist/get_all_users.php")
+    suspend fun getAllUsers(): List<SearchUser>
 }
 
 object RetrofitClient {
-    private const val BASE_URL = "http://10.0.2.2/"
+    private const val BASE_URL = "http://10.0.2.2:8081/"
     val apiService: ChatApiService by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
@@ -85,24 +89,24 @@ class ChatViewModel : ViewModel() {
     private val _activeUsers = MutableStateFlow<List<ActiveUser>>(emptyList())
     val activeUsers: StateFlow<List<ActiveUser>> = _activeUsers
 
+    private val _allUsers = MutableStateFlow<List<SearchUser>>(emptyList())
+    val allUsers: StateFlow<List<SearchUser>> = _allUsers
+
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading
-    private val currentUserId = "u1"
-    // [MỚI] Biến chứa kết quả tìm kiếm
+
     private val _searchResults = MutableStateFlow<List<SearchUser>>(emptyList())
     val searchResults: StateFlow<List<SearchUser>> = _searchResults
 
-    init {
-        fetchAllData()
-    }
-
-    fun fetchAllData() {
+    fun fetchAllData(userId: String) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                // Truyền currentUserId vào
-                _chatList.value = RetrofitClient.apiService.getChats(currentUserId)
+                _chatList.value = RetrofitClient.apiService.getChats(userId)
                 _activeUsers.value = RetrofitClient.apiService.getActiveUsers()
+                _allUsers.value = RetrofitClient.apiService
+                    .getAllUsers()
+                    .filter { it.id != userId }
             } catch (e: Exception) {
                 println("Lỗi gọi API: ${e.message}")
             } finally {
@@ -111,26 +115,28 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    fun togglePin(chatId: String, currentPinStatus: Boolean) {
+    fun togglePin(userId: String, chatId: String, currentPinStatus: Boolean) {
         viewModelScope.launch {
             try {
                 _chatList.value = _chatList.value.map {
                     if (it.id == chatId) it.copy(isPinned = !currentPinStatus) else it
                 }.sortedByDescending { it.isPinned }
 
-                // Gửi kèm currentUserId lên server
-                RetrofitClient.apiService.togglePin(TogglePinRequest(chatId, !currentPinStatus, currentUserId))
+                RetrofitClient.apiService.togglePin(
+                    TogglePinRequest(chatId, !currentPinStatus, userId)
+                )
             } catch (e: Exception) {
-                fetchAllData()
+                fetchAllData(userId)
             }
         }
     }
-    // [MỚI] Hàm gọi API tìm kiếm
+
     fun search(query: String) {
         if (query.isBlank()) {
-            _searchResults.value = emptyList() // Xóa kết quả nếu xóa ô tìm kiếm
+            _searchResults.value = emptyList()
             return
         }
+
         viewModelScope.launch {
             try {
                 _searchResults.value = RetrofitClient.apiService.searchUsers(query)
@@ -140,24 +146,36 @@ class ChatViewModel : ViewModel() {
             }
         }
     }
-    fun createGroup(name: String, type: String, members: List<SearchUser>) {
+
+    fun createGroup(
+        userId: String,
+        name: String,
+        type: String,
+        members: List<SearchUser>,
+        onSuccess: () -> Unit = {}
+    ) {
         viewModelScope.launch {
             try {
-                // 1. Lấy danh sách ID của các thành viên được chọn
-                val memberIds = members.map { it.id }
+                val memberIds = (members.map { it.id } + userId).distinct()
 
-                // 2. Bắn API lên server XAMPP
-                val request = CreateGroupRequest(name, type, memberIds)
+                val request = CreateGroupRequest(
+                    groupName = name,
+                    groupType = type,
+                    memberIds = memberIds,
+                    creatorId = userId
+                )
+
                 RetrofitClient.apiService.createGroup(request)
 
-                // 3. THẦN CHÚ CẬP NHẬT NGAY LẬP TỨC: Gọi lại hàm fetchAllData() để lấy danh sách mới nhất từ DB về
-                fetchAllData()
+                fetchAllData(userId)
+
+                onSuccess()
             } catch (e: Exception) {
                 println("Lỗi tạo nhóm: ${e.message}")
             }
         }
     }
-    // [MỚI] Hàm dọn dẹp kết quả tìm kiếm (khi thoát trang)
+
     fun clearSearchResults() {
         _searchResults.value = emptyList()
     }

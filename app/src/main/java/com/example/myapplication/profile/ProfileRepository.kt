@@ -104,4 +104,21 @@ class ProfileRepository(
             Result.failure(e)
         }
     }
+    suspend fun acceptFriendRequest(
+        senderId: Int,
+        receiverId: Int
+    ): Result<String> {
+        return try {
+            val body = SendFriendRequestBody(senderId, receiverId)
+            val response = api.acceptFriendRequest(body)
+
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(response.body()?.message ?: "Đã chấp nhận")
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Lỗi chấp nhận"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

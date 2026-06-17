@@ -29,4 +29,9 @@ interface ApiService {
     suspend fun updateProfile(
         @Body body: UpdateProfileBody
     ): Response<ApiResponse<UpdatedUser>>
+
+    @POST("accept_friend_request.php")
+    suspend fun acceptFriendRequest(
+        @Body body: SendFriendRequestBody
+    ): Response<ApiResponse<Any>>
 }

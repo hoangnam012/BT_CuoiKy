@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -35,6 +36,7 @@ import com.example.myapplication.R
 fun ChatBubble(
     message: Message,
     isGroupChat: Boolean = false,
+    targetAvatarUrl: String = "",
     onLongClick: (Int) -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
@@ -49,10 +51,17 @@ fun ChatBubble(
     ) {
         if (!message.isMine) {
             val avatarName = message.sender_name ?: "User"
-            val avatarUrl = message.sender_avatar ?: "https://ui-avatars.com/api/?name=${avatarName.replace(" ", "+")}&background=random"
+            val avatarUrl = if (!message.sender_avatar.isNullOrEmpty()) {
+                message.sender_avatar
+            } else if (targetAvatarUrl.isNotEmpty()) {
+                targetAvatarUrl
+            } else {
+                "https://ui-avatars.com/api/?name=${avatarName.replace(" ", "+")}&background=random"
+            }
             AsyncImage(
-                model = "https://ui-avatars.com/api/?name=Thang+Pham&background=random",
+                model = avatarUrl,
                 contentDescription = null,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier.size(32.dp).clip(CircleShape)
             )
             Spacer(modifier = Modifier.width(8.dp))

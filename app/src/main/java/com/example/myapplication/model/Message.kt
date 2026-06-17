@@ -9,10 +9,10 @@ data class Message(
     val senderId: Int,
 
     @SerializedName("receiver_id")
-    val receiverId: Int,
+    val receiverId: String,
 
     val content: String,
-    val type: String,
+    val type: String? = "text",
     val created_at: String,
     val avatar: String? = null,
     val isMine: Boolean = false,

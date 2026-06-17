@@ -60,7 +60,7 @@ fun LoginScreen(navController: NavController) {
             Spacer(modifier = Modifier.height(24.dp))
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
                 Spacer(modifier = Modifier.width(10.dp))
-                Text(text = "Tên app", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = DiscordLightGray)
+                Text(text = "Lumina", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = DiscordLightGray)
             }
             Spacer(modifier = Modifier.height(60.dp))
 
@@ -130,10 +130,17 @@ fun LoginScreen(navController: NavController) {
                                 coroutineScope.launch {
                                     val result = authRepository.login(email.trim(), password)
                                     isLoading = false
-                                    result.onSuccess {
+                                    result.onSuccess { response ->
                                         Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
                                         // Đăng nhập đúng thì điều hướng đi tiếp (Ví dụ vào màn hình chat detail)
-                                        navController.navigate("chat_detail")
+
+                                        val loggedInUserId= response.user?.id ?: 1
+
+                                        navController.navigate("chat_list/$loggedInUserId") {
+                                            popUpTo("auth_graph") {
+                                                inclusive = true
+                                            }
+                                        }
                                     }.onFailure {
                                         Toast.makeText(context, it.message ?: "Lỗi đăng nhập", Toast.LENGTH_LONG).show()
                                     }

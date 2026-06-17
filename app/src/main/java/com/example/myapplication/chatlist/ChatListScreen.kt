@@ -1,4 +1,4 @@
-package com.example.myapplication.ui.chatlist
+package com.example.myapplication.chatlist
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,13 +17,25 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
-fun ChatListScreen(viewModel: ChatViewModel = viewModel()) {
+fun ChatListScreen(
+    viewModel: ChatViewModel = viewModel(),
+    loggedInUserId: String,
+    onOpenChatDetail: (String, String, String, Boolean) -> Unit = {_, _, _, _ ->},
+    onOpenMyProfile: () -> Unit = {}
+    ) {
     var selectedTab by remember { mutableStateOf(0) }
     var currentRoute by remember { mutableStateOf("MAIN") }
 
     val chatList by viewModel.chatList.collectAsState()
     val activeUsers by viewModel.activeUsers.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+
+    val allUsers by viewModel.allUsers.collectAsState()
+    LaunchedEffect(loggedInUserId) {
+        viewModel.fetchAllData(loggedInUserId)
+    }
+
+    val groupUsers = allUsers.filter { it.id != loggedInUserId }
 
     val recentSearches = remember {
         mutableStateListOf(
@@ -44,16 +56,44 @@ fun ChatListScreen(viewModel: ChatViewModel = viewModel()) {
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             when (currentRoute) {
                 "MAIN" -> {
-                    if (selectedTab == 0) {
-                        ChatsTabScreen(
-                            chatList = chatList,
-                            activeUsers = activeUsers,
-                            isLoading = isLoading,
-                            onSearchClick = { currentRoute = "SEARCH_MAIN" },
-                            onEditClick = { currentRoute = "NEW_MESSAGE" },
-                            onPinToggle = { id, isPinned -> viewModel.togglePin(id, isPinned) }
-                        )
-                    } else { Box(modifier = Modifier.fillMaxSize().background(BackgroundDark)) }
+                    when (selectedTab) {
+                        0 -> {
+                            ChatsTabScreen(
+                                chatList = chatList,
+                                activeUsers = activeUsers,
+                                isLoading = isLoading,
+                                onSearchClick = { currentRoute = "SEARCH_MAIN" },
+                                onEditClick = { currentRoute = "NEW_MESSAGE" },
+                                onPinToggle = { id, isPinned ->
+                                    viewModel.togglePin(loggedInUserId, id, isPinned)
+                                },
+                                onChatClick = onOpenChatDetail,
+                                onActiveUserClick = { id, name, avatar ->
+                                    onOpenChatDetail(id, name, avatar, false)
+                                }
+                            )
+                        }
+
+                        4 -> {
+                            LaunchedEffect(selectedTab) {
+                                onOpenMyProfile()
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(BackgroundDark)
+                            )
+                        }
+
+                        else -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(BackgroundDark)
+                            )
+                        }
+                    }
                 }
                 "SEARCH_MAIN" -> SearchMainScreen(recentSearches, { currentRoute = "MAIN" }, { currentRoute = "SEARCH_EDIT" }, { currentRoute = "SEARCH_ACTIVE" })
                 "SEARCH_EDIT" -> SearchEditScreen(recentSearches, { currentRoute = "SEARCH_MAIN" })
@@ -63,18 +103,29 @@ fun ChatListScreen(viewModel: ChatViewModel = viewModel()) {
                         searchResults = searchResults,
                         onSearchQueryChange = { query -> viewModel.search(query) },
                         onBack = {
-                            viewModel.clearSearchResults() // Dọn dẹp dữ liệu khi thoát
+                            viewModel.clearSearchResults()
                             currentRoute = "SEARCH_MAIN"
+                        },
+                        onUserClick = { user ->
+                            onOpenChatDetail(user.id, user.name, "", false)
                         }
                     )
                 }
                 "NEW_MESSAGE" -> NewMessageScreen(
-                    contacts = chatList, // <--- Truyền thẳng danh sách Chat thật vào thay vì recentSearches
+                    users = allUsers,
                     onBack = { currentRoute = "MAIN" },
-                    onGroupClick = { selectedGroupMembers.clear(); groupName = ""; currentRoute = "NEW_GROUP" },
-                    onPinClick = { currentRoute = "PIN_CHAT" }
+                    onGroupClick = {
+                        selectedGroupMembers.clear()
+                        groupName = ""
+                        currentRoute = "NEW_GROUP"
+                    },
+                    onPinClick = { currentRoute = "PIN_CHAT" },
+                    onUserClick = { user ->
+                        // Tạm thời test: bấm user thì vào chat detail
+                        onOpenChatDetail(user.id, user.name, "", false)
+                    }
                 )
-                "NEW_GROUP" -> NewGroupScreen(recentSearches, selectedGroupMembers, { currentRoute = "NEW_MESSAGE" }, { currentRoute = "GROUP_INFO" })
+                "NEW_GROUP" -> NewGroupScreen(groupUsers, selectedGroupMembers, { currentRoute = "NEW_MESSAGE" }, { currentRoute = "GROUP_INFO" })
                 "GROUP_INFO" -> GroupInfoScreen(
                     selectedMembers = selectedGroupMembers,
                     groupName = groupName,
@@ -84,17 +135,21 @@ fun ChatListScreen(viewModel: ChatViewModel = viewModel()) {
                     onBack = { currentRoute = "NEW_GROUP" },
                     onCreate = {
                         // 1. Gọi hàm lưu vào CSDL
-                        viewModel.createGroup(groupName, groupType, selectedGroupMembers)
-
-                        // 2. Quay về màn hình chính, lúc này danh sách đã tự động chớp mắt cập nhật nhóm mới!
-                        currentRoute = "MAIN"
+                        viewModel.createGroup(
+                            userId = loggedInUserId,
+                            name = groupName,
+                            type = groupType,
+                            members = selectedGroupMembers
+                        ) {
+                            currentRoute = "MAIN"
+                        }
                     }
                 )
                 "PIN_CHAT" -> PinChatScreen(
                     contacts = chatList, // Đưa danh sách Chat từ DB vào
                     onBack = { currentRoute = "NEW_MESSAGE" },
                     onDone = { currentRoute = "NEW_MESSAGE" },
-                    onPinToggle = { id, isPinned -> viewModel.togglePin(id, isPinned) } // Truyền hàm gọi CSDL vào
+                    onPinToggle = { id, isPinned -> viewModel.togglePin(loggedInUserId,id, isPinned) } // Truyền hàm gọi CSDL vào
                 )
             }
         }
@@ -108,12 +163,19 @@ fun ChatsTabScreen(
     isLoading: Boolean,
     onSearchClick: () -> Unit,
     onEditClick: () -> Unit,
-    onPinToggle: (String, Boolean) -> Unit
+    onPinToggle: (String, Boolean) -> Unit,
+    onActiveUserClick: (String, String, String) -> Unit,
+    onChatClick: (String, String, String, Boolean) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         TopHeader(title = "CHATS", showEdit = true, onEditClick = onEditClick)
         // Gọi list Active Users động từ Database
-        ActiveUsersRow(users = activeUsers)
+        ActiveUsersRow(
+            users = activeUsers,
+            onUserClick = { user ->
+                onActiveUserClick(user.id, user.name, user.avatarUrl ?: "")
+            }
+        )
 
         Box(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
@@ -135,7 +197,20 @@ fun ChatsTabScreen(
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(chatList) { chat ->
-                    ChatItemRow(chatItem = chat, onPinToggle = { onPinToggle(chat.id, chat.isPinned) })
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onChatClick(chat.id, chat.senderName,chat.avatarUrl, chat.isGroup)
+                            }
+                    ) {
+                        ChatItemRow(
+                            chatItem = chat,
+                            onPinToggle = {
+                                onPinToggle(chat.id, chat.isPinned)
+                            }
+                        )
+                    }
                 }
             }
         }

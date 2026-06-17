@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -41,17 +43,27 @@ import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.myapplication.R
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatDetailScreen() {
+fun ChatDetailScreen(
+    loggedInUserId: String,
+    targetUserId: String,
+    targetName: String,
+    targetAvatarUrl: String = "",
+    isGroupChat: Boolean,
+    onBack: () -> Unit = {},
+    onOpenProfile: (String) -> Unit = {}
+) {
     var messages by remember { mutableStateOf(listOf<Message>()) }
     val chatApi = remember { ChatApi.create() }
     val scope = rememberCoroutineScope()
 
-    val myId =1;
-    val currentGroupId =1
-    val isGroupChat = true
+    val myId =loggedInUserId.toIntOrNull() ?: 1
+    val targetId = targetUserId
+    val isGroupInt = if (isGroupChat) 1 else 0
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var messageToDelete by remember { mutableStateOf<Message?>(null) }
@@ -64,7 +76,7 @@ fun ChatDetailScreen() {
     val bgState = rememberBackgroundState(
         context = context,
         myId = myId,
-        targetId = currentGroupId,
+        targetId = targetId,
         isGroup = isGroupChat
     )
     var showMenu by remember { mutableStateOf(false) }
@@ -73,22 +85,44 @@ fun ChatDetailScreen() {
     fun loadData() {
         scope.launch {
             try {
-                val response = if (isGroupChat) {
-                    chatApi.getGroupMessages(currentGroupId)
-                } else {
-                    chatApi.getMessages(myId, 2)
-                }
-                messages = response.reversed().map { it.copy(isMine = it.senderId == 1) }
-            } catch (e: Exception) { e.printStackTrace() }
+                val response = chatApi.getMessages(
+                    myId,
+                    targetId,
+                    isGroupInt
+                )
+
+                messages = response.map {
+                    it.copy(isMine = it.senderId == myId)
+                }.toList()
+
+            } catch (e: Exception) {
+                android.util.Log.e("LỖI_CHAT", "Chi tiết lỗi: ${e.message}")
+                e.printStackTrace()
+            }
         }
     }
 
-    LaunchedEffect(Unit) { loadData() }
+    LaunchedEffect(targetId) {
+        while (true) {
+            loadData() // Tự động gọi hàm lấy tin nhắn
+            delay(3000L) // Nghỉ 3 giây rồi lặp lại
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 windowInsets = TopAppBarDefaults.windowInsets,
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_back),
+                            contentDescription = "Quay lại",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                },
                 title = {
                     if (isSearching) {
                         OutlinedTextField(
@@ -109,21 +143,35 @@ fun ChatDetailScreen() {
                         )
                     }
                     else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clickable {
+                                    if (!isGroupChat) {
+                                        onOpenProfile(targetUserId)
+                                    }
+                                }
+                                .padding(start = 4.dp, end = 8.dp)
+                        ) {
                             AsyncImage(
-                                model = if (isGroupChat) "https://ui-avatars.com/api/?name=Nhom+Do+An&background=random"
-                                else "https://ui-avatars.com/api/?name=Thang+Pham&background=random",
+                                model = if (targetAvatarUrl.isNotEmpty()) targetAvatarUrl
+                                else "https://ui-avatars.com/api/?name=${targetName.replace(" ", "+")}&background=random",
                                 contentDescription = null,
-                                modifier = Modifier.size(36.dp).clip(CircleShape)
+                                contentScale = ContentScale.Crop, // Thêm ContentScale.Crop để ảnh tròn không bị méo
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
                             )
+
                             Spacer(modifier = Modifier.width(12.dp))
+
                             Column {
                                 Text(
-                                    text = if (isGroupChat) "Nhóm Đồ Án VKU" else "Thắng Phạm",
+                                    text = targetName,
                                     style = MaterialTheme.typography.titleMedium
                                 )
                                 Text(
-                                    text = if (isGroupChat) "3 thành viên" else "Đang hoạt động",
+                                    text = if (isGroupChat) "Nhóm" else "Đang hoạt động",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = DiscordGreen
                                 )
@@ -190,7 +238,8 @@ fun ChatDetailScreen() {
                     onSendMessage = { text ->
                         scope.launch {
                             try {
-                                chatApi.sendMessages(1, 1, text, isGroup = 1)
+                                chatApi.sendMessages(myId, targetId, text, isGroup = isGroupInt)
+                                delay(300)
                                 loadData()
                             } catch (e: Exception) {
                                 e.printStackTrace()
@@ -204,13 +253,13 @@ fun ChatDetailScreen() {
                             val timerTemp = sdfTemp.format(Date())
                             val tempMessage = Message(
                                 id = System.currentTimeMillis().toInt(),
-                                senderId = 1,
-                                receiverId = 1,
+                                senderId = myId,
+                                receiverId = targetId,
                                 content = uri.toString(),
                                 type = "image_uploading",
                                 isDeleted = 0,
                                 created_at = timerTemp,
-                                is_group = 1,
+                                is_group = isGroupInt,
                                 isMine = true
                             )
                             messages = listOf(tempMessage) + messages
@@ -234,11 +283,11 @@ fun ChatDetailScreen() {
                                         )
 
                                     val senderIdPart =
-                                        "1".toRequestBody("text/plain".toMediaTypeOrNull())
+                                        myId.toString().toRequestBody("text/plain".toMediaTypeOrNull())
                                     val receiverIdPart =
-                                        "1".toRequestBody("text/plain".toMediaTypeOrNull())
+                                        targetId.toString().toRequestBody("text/plain".toMediaTypeOrNull())
                                     val isGroupPart =
-                                        "1".toRequestBody("text/plain".toMediaTypeOrNull())
+                                        isGroupInt.toString().toRequestBody("text/plain".toMediaTypeOrNull())
 
                                     chatApi.sendImage(
                                         senderIdPart,
@@ -265,14 +314,14 @@ fun ChatDetailScreen() {
                                         SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
                                     val tempMessage = Message(
                                         id = System.currentTimeMillis().toInt(),
-                                        senderId = 1,
-                                        receiverId = 1,
+                                        senderId = myId,
+                                        receiverId = targetId,
                                         content = uri.toString(),
                                         type = "file_uploading",
                                         isDeleted = 0,
                                         created_at = sdfTemp.format(Date()),
                                         isMine = true,
-                                        is_group = 1,
+                                        is_group = isGroupInt,
                                         fileName = fileToSend.name
                                     )
 
@@ -286,11 +335,11 @@ fun ChatDetailScreen() {
                                         requestFile
                                     )
                                     val senderIdPart =
-                                        "1".toRequestBody("text/plain".toMediaTypeOrNull())
+                                        myId.toString().toRequestBody("text/plain".toMediaTypeOrNull())
                                     val receiverIdPart =
-                                        "1".toRequestBody("text/plain".toMediaTypeOrNull())
+                                        targetId.toString().toRequestBody("text/plain".toMediaTypeOrNull())
                                     val isGroupPart =
-                                        "1".toRequestBody("text/plain".toMediaTypeOrNull())
+                                        isGroupInt.toString().toRequestBody("text/plain".toMediaTypeOrNull())
 
                                     chatApi.upLoadFile(
                                         senderIdPart,
@@ -332,6 +381,8 @@ fun ChatDetailScreen() {
                 messages = filteredMessage,
                 padding = PaddingValues(0.dp),
                 isSearching = isSearching,
+                isGroupChat = isGroupChat,
+                targetAvatarUrl = targetAvatarUrl,
                 onLongClick = { msg ->
                     messageToDelete = msg
                     showDeleteDialog = true
@@ -367,15 +418,43 @@ fun ChatDetailScreen() {
 }
 
 @Composable
-fun MessageList(messages: List<Message>, padding: PaddingValues, isSearching: Boolean = false, onLongClick: (Message) -> Unit) {
+fun MessageList(
+    messages: List<Message>,
+    padding: PaddingValues,
+    isSearching: Boolean = false,
+    isGroupChat: Boolean,
+    targetAvatarUrl: String,
+    onLongClick: (Message) -> Unit
+) {
+    val sortedMessages = messages.sortedBy { it.created_at }
+
+    // Đảo lại: tin mới nhất nằm ở index 0
+    val chatMessages = sortedMessages.asReversed()
+
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(chatMessages.size) {
+        if (chatMessages.isNotEmpty() && !isSearching) {
+            // reverseLayout = true thì index 0 nằm dưới cùng
+            listState.scrollToItem(0)
+        }
+    }
+
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(padding),
+        state = listState,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(padding),
         contentPadding = PaddingValues(16.dp),
-        reverseLayout = !isSearching
+        reverseLayout = true
     ) {
-        itemsIndexed(messages) { index, msg ->
-            var oldMsg = messages.getOrNull(index +1)
-            var showTimeHeader = oldMsg == null || isOver30Minutes(msg.created_at, oldMsg.created_at)
+        itemsIndexed(chatMessages) { index, msg ->
+
+            val nextMsg = chatMessages.getOrNull(index + 1)
+
+            val showTimeHeader =
+                nextMsg == null || isOver30Minutes(msg.created_at, nextMsg.created_at)
+
             Column(modifier = Modifier.fillMaxWidth()) {
                 if (showTimeHeader && msg.created_at.isNotBlank()) {
                     Text(
@@ -387,13 +466,14 @@ fun MessageList(messages: List<Message>, padding: PaddingValues, isSearching: Bo
                             .align(Alignment.CenterHorizontally)
                     )
                 }
-
                 ChatBubble(
                     message = msg,
-                    isGroupChat = true,
+                    isGroupChat = isGroupChat,
+                    targetAvatarUrl = targetAvatarUrl,
                     onLongClick = { onLongClick(msg) }
                 )
             }
         }
     }
 }
+

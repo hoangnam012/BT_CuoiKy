@@ -18,7 +18,7 @@ data class BackgroundState(
 fun rememberBackgroundState(
     context: Context,
     myId: Int,
-    targetId: Int,
+    targetId: String,
     isGroup: Boolean
     ): BackgroundState {
 
