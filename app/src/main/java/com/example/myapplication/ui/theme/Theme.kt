@@ -1,7 +1,6 @@
 package com.example.myapplication.ui.theme
 
 import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -34,15 +33,15 @@ private val LightColorScheme = lightColorScheme(
     onSurface = Color.Black
 )
 
-@RequiresApi(Build.VERSION_CODES.S)
+// ĐÃ XÓA dòng @RequiresApi ở đây để app chạy được trên mọi máy
 @Composable
 fun MyApplicationTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = true,
     dynamicColor: Boolean = false, // Vẫn để false để giữ màu Discord
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
-        // Chỉ dùng dynamicColor nếu máy hỗ trợ (Android 12+) và biến dynamicColor là true
+        // Code bên trong đã tự check an toàn rồi nên không cần @RequiresApi bên ngoài nữa
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -50,7 +49,7 @@ fun MyApplicationTheme(
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
-    
+
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
