@@ -32,7 +32,15 @@ fun ChatListScreen(
 
     val allUsers by viewModel.allUsers.collectAsState()
     LaunchedEffect(loggedInUserId) {
-        viewModel.fetchAllData(loggedInUserId)
+        // PHA 1: Lần đầu tiên mở màn hình -> Gọi bình thường để nó hiện vòng xoay cho đẹp
+        viewModel.fetchAllData(loggedInUserId, isBackground = false)
+
+        // PHA 2: Vào vòng lặp chạy ngầm mãi mãi
+        while (true) {
+            kotlinx.coroutines.delay(3000L) // Nghỉ 3 giây
+            // Gọi data nhưng truyền cờ chạy ngầm = true để giấu cái vòng xoay đi
+            viewModel.fetchAllData(loggedInUserId, isBackground = true)
+        }
     }
 
     val groupUsers = allUsers.filter { it.id != loggedInUserId }

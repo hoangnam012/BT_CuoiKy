@@ -13,6 +13,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
+import retrofit2.http.Headers
 
 // --- BẢNG MÀU ---
 val Purple80 = Color(0xFFD0BCFF)
@@ -54,6 +55,7 @@ interface ChatApiService {
     @GET("BT_CuoiKyBackend/chatlist/get_chats.php")
     suspend fun getChats(@Query("userId") userId: String): List<ChatItemData>
 
+    @Headers("Cache-Control: no-cache")
     @GET("BT_CuoiKyBackend/chatlist/get_active_users.php")
     suspend fun getActiveUsers(): List<ActiveUser>
 
@@ -98,9 +100,12 @@ class ChatViewModel : ViewModel() {
     private val _searchResults = MutableStateFlow<List<SearchUser>>(emptyList())
     val searchResults: StateFlow<List<SearchUser>> = _searchResults
 
-    fun fetchAllData(userId: String) {
+    fun fetchAllData(userId: String, isBackground: Boolean = false) {
         viewModelScope.launch {
-            _isLoading.value = true
+            // Chỉ bật vòng xoay nếu KHÔNG PHẢI là chạy ngầm
+            if (!isBackground) {
+                _isLoading.value = true
+            }
             try {
                 _chatList.value = RetrofitClient.apiService.getChats(userId)
                 _activeUsers.value = RetrofitClient.apiService.getActiveUsers()
@@ -110,7 +115,10 @@ class ChatViewModel : ViewModel() {
             } catch (e: Exception) {
                 println("Lỗi gọi API: ${e.message}")
             } finally {
-                _isLoading.value = false
+                // Tắt vòng xoay
+                if (!isBackground) {
+                    _isLoading.value = false
+                }
             }
         }
     }

@@ -18,7 +18,6 @@ import retrofit2.http.Query
 import retrofit2.http.Headers
 
 interface ChatApi {
-
     @Headers("Cache-Control: no-cache")
     @GET("BT_CuoiKyBackend/get_messages.php")
     suspend fun getMessages(
